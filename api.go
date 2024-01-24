@@ -25,7 +25,7 @@ func NewAPIServer(listenAddr string, store Storage) *APIServer {
 }
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
-
+	router.HandleFunc("/login", makeHTTPHandleFunc(s.handelLogin))
 	router.HandleFunc("/account", makeHTTPHandleFunc(s.handleAccount))
 	router.HandleFunc("/account/{id}", withJWTAuth(makeHTTPHandleFunc(s.handleGetAccountByID), s.store))
 	router.HandleFunc("/transfer/{accountNumber}", makeHTTPHandleFunc(s.handleTransfer))
@@ -34,6 +34,18 @@ func (s *APIServer) Run() {
 	http.ListenAndServe(s.listenAddr, router)
 }
 
+func (s *APIServer) handelLogin(w http.ResponseWriter, r *http.Request) error {
+	if r.Method != "POST" {
+		return fmt.Errorf("method not allow %s", r.Method)
+	}
+
+	var req LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, req)
+}
 func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
 		return s.handleGetAccount(w, r)
@@ -74,19 +86,22 @@ func (s *APIServer) handleGetAccountByID(w http.ResponseWriter, r *http.Request)
 
 func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
 	//createAccountReq := new(CreatAccountRequest)
-	createAccountReq := CreatAccountRequest{}
-	if err := json.NewDecoder(r.Body).Decode(&createAccountReq); err != nil {
+	req := CreatAccountRequest{}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return err
 	}
-	account := NewAccount(createAccountReq.FirstName, createAccountReq.LastName)
-	if err := s.store.CreateAccount(account); err != nil {
-		return err
-	}
-	tokenString, err := createJWT(account)
+	account, err := NewAccount(req.FirstName, req.LastName, req.Password)
 	if err != nil {
 		return err
 	}
-	fmt.Println("JWT token: ", tokenString)
+	if err := s.store.CreateAccount(account); err != nil {
+		return err
+	}
+	//tokenString, err := createJWT(account)
+	//if err != nil {
+	//	return err
+	//}
+	//fmt.Println("JWT token: ", tokenString)
 	return WriteJSON(w, http.StatusOK, account)
 }
 
