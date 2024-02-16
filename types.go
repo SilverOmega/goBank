@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+type LoginRespone struct {
+	Number int64  `json:"number"`
+	Token  string `json:"token"`
+}
 type LoginRequest struct {
 	Number   int64  `json:"toAccount"`
 	Password string `json:"password"`
@@ -30,16 +34,21 @@ type Account struct {
 	CreateAt          time.Time `json:"createAt"`
 }
 
+func (a *Account) ValidPassword(pw string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(a.EncryptedPassword), []byte(pw)) == nil
+}
+
 func NewAccount(firstName, lastName, password string) (*Account, error) {
 	encpw, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Account{
 		FirstName:         firstName,
 		LastName:          lastName,
 		EncryptedPassword: string(encpw),
-		Number:            int64(rand.Intn(100000)),
+		Number:            int64(rand.Intn(1000000)),
 		CreateAt:          time.Now().UTC(),
 	}, nil
 }

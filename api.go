@@ -43,8 +43,24 @@ func (s *APIServer) handelLogin(w http.ResponseWriter, r *http.Request) error {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return err
 	}
+	acc, err := s.store.GetAccountByNumber(int(req.Number))
+	if err != nil {
+		return err
+	}
 
-	return WriteJSON(w, http.StatusOK, req)
+	if !acc.ValidPassword(req.Password) {
+		fmt.Errorf("not authenticated")
+	}
+	token, err := createJWT(acc)
+	if err != nil {
+		return err
+	}
+	resp := LoginRespone{
+		Token:  token,
+		Number: acc.Number,
+	}
+	//fmt.Printf("%+v\n", acc)
+	return WriteJSON(w, http.StatusOK, resp)
 }
 func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
@@ -86,7 +102,8 @@ func (s *APIServer) handleGetAccountByID(w http.ResponseWriter, r *http.Request)
 
 func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
 	//createAccountReq := new(CreatAccountRequest)
-	req := CreatAccountRequest{}
+	//req := CreatAccountRequest{}
+	req := new(CreatAccountRequest)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return err
 	}
@@ -97,11 +114,7 @@ func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) 
 	if err := s.store.CreateAccount(account); err != nil {
 		return err
 	}
-	//tokenString, err := createJWT(account)
-	//if err != nil {
-	//	return err
-	//}
-	//fmt.Println("JWT token: ", tokenString)
+
 	return WriteJSON(w, http.StatusOK, account)
 }
 
@@ -172,6 +185,7 @@ func withJWTAuth(handlerFunc http.HandlerFunc, s Storage) http.HandlerFunc {
 			return
 		}
 		claims := token.Claims.(jwt.MapClaims)
+		//panic(claims)
 		//panic(reflect.TypeOf(claims["accountNumber"]))
 		if account.Number != int64(claims["accountNumber"].(float64)) {
 			permissionDenied(w)
